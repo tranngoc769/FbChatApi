@@ -417,22 +417,48 @@ class Session:
         except requests.RequestException as e:
             _exception.handle_requests_error(e)
         _exception.handle_http_error(r.status_code)
+        soup = bs4.BeautifulSoup(r.text, "html.parser")
 
-        define = parse_server_js_define(r.content.decode("utf-8"))
+        fb_dtsg = ''
 
-        fb_dtsg = get_fb_dtsg(define)
-        if fb_dtsg is None:
-            raise _exception.ParseError("Could not find fb_dtsg", data=define)
-        if not fb_dtsg:
-            # Happens when the client is not actually logged in
-            raise _exception.NotLoggedIn(
-                "Found empty fb_dtsg, the session was probably invalid."
-            )
+        if fb_dtsg == None or fb_dtsg == "":
+            FB_DTSG_REGEX = re.compile(r'"[a-zA-Z0-9-_:]+:+[a-zA-Z0-9-_:]*"')
+            fb_dtsg = FB_DTSG_REGEX.search(r.text).group(0)
+            fb_dtsg = fb_dtsg.replace('"', "")
+            fb_dtsg = fb_dtsg.replace("'", '')
+            # print("\n\n[latest] fb_dtsg:\n")
+            # print(fb_dtsg)
 
-        try:
-            revision = int(define["SiteData"]["client_revision"])
-        except TypeError:
-            raise _exception.ParseError("Could not find client revision", data=define)
+
+        if fb_dtsg == None or fb_dtsg == "":
+            fb_dtsg_element = soup.find("input", {"name": "fb_dtsg"})
+            print("\n\n[1]fb_dtsg_element:\n")
+            print(fb_dtsg_element)
+            if fb_dtsg_element:
+                fb_dtsg = fb_dtsg_element["value"]
+                # print("\n\n[1.1]fb_dtsg_element:\n")
+                # print(fb_dtsg)
+
+        if fb_dtsg == None or fb_dtsg == "":
+            # Fall back to searching with a regex
+            fb_dtsg = ''
+            try:
+                fb_dtsg = FB_DTSG_REGEX.search(r.text).group(1)
+                # print("\n\n[2]fb_dtsg_element:\n")
+                # print(fb_dtsg)
+            except:
+                pass
+
+
+        if fb_dtsg == None or fb_dtsg == "":
+            FB_DTSG_REGEX = re.compile(r'"[a-zA-Z0-9_.-]*:[a-zA-Z0-9_.-]*"\)')
+            fb_dtsg = FB_DTSG_REGEX.search(r.text).group(0)
+            fb_dtsg = fb_dtsg.replace(")", "")
+            fb_dtsg = fb_dtsg.replace('"', '')
+            # print("\n\n[3]fb_dtsg_element:\n")
+            # print(fb_dtsg)
+
+        revision = int(r.text.split('"client_revision":')[1].split(",", 1)[0])
 
         return cls(user_id=user_id, fb_dtsg=fb_dtsg, revision=revision, session=session)
 

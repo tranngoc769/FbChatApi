@@ -21,7 +21,6 @@ def load_session(cookies):
         print(err)
         return  # Failed loading from cookies
 cookies = load_cookies("session.json")
-print(cookies)
 session = load_session(cookies)
 client = fbchat.Client(session=session)
 if not session:
